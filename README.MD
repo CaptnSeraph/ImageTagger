@@ -1,6 +1,6 @@
-  # Image Tagger
+# Image Tagger
 
-    Image Tagger is a simple tool designed to help you tag your images quickly and efficiently. It provides a convenient graphical user interface for loading images, viewing thumbnails, and tagging selected images
+Image Tagger is a simple tool designed to help you tag your images quickly and efficiently. It provides a convenient graphical user interface for loading images, viewing thumbnails, and tagging selected images
 
 ## Features
 
