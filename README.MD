@@ -1,16 +1,15 @@
-    # Image Tagger
+  # Image Tagger
 
     Image Tagger is a simple tool designed to help you tag your images quickly and efficiently. It provides a convenient graphical user interface for loading images, viewing thumbnails, and tagging selected images
 
-    ## Features
+## Features
 
     - Load images from a directory of your choice
     - View thumbnails of all loaded images
     - Adjust the size of the thumbnails with a convenient slider
     - Select images to tag by checking the box next to the thumbnail
     - Enter your tag in a text box and apply it to all selected images with a single click
-
-    ## Requirements
+## Requirements
 
     This application requires Python 3.6 or higher, and the following Python libraries:
 
@@ -23,7 +22,7 @@
     pip install -r requirements.txt
     ```
 
-    ## Usage
+## Usage
 
     1. Run the script:
 
@@ -39,6 +38,6 @@
 
     5. The selected images will be deselected and you can start the process again from step 3.
 
-    ## License
+## License
 
-    This project is licensed under the MIT License.
+  This project is licensed under the MIT License.
