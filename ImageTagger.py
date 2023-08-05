@@ -99,6 +99,26 @@ class ImageTagger(QWidget):
         self.thumbnail_slider.setValue(THUMBNAIL_SIZE)
         self.thumbnail_slider.setFixedHeight(50)
         self.splitter.addWidget(self.thumbnail_slider)
+        self.thumbnail_slider.sliderReleased.connect(self.on_slider_value_changed)
+
+    def clear_gallery(self):
+        for i in reversed(range(self.grid_layout.count())): 
+            self.grid_layout.itemAt(i).widget().setParent(None)
+        self.items = []
+
+
+# Change the on_slider_value_changed function to this
+    def on_slider_value_changed(self):
+        # Get the current value of the slider
+        value = self.thumbnail_slider.value()
+        # Update the thumbnail size
+        global THUMBNAIL_SIZE
+        THUMBNAIL_SIZE = value
+        # Clear the current images
+        self.clear_gallery()
+        # Reload the images with the new size
+        self.update_gallery()
+
 
     def load_images(self):
         dir_path = QFileDialog.getExistingDirectory(self, 'Select a directory')
