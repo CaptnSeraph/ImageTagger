@@ -1,11 +1,12 @@
-import sys
-import os
-import glob
-from PyQt5.QtWidgets import (QApplication, QSlider, QScrollArea, QGridLayout, QHBoxLayout, QWidget, 
-                            QVBoxLayout, QPushButton, QFileDialog, QLabel, QLineEdit, QSplitter, QCheckBox)
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import (QApplication, QSlider, QScrollArea, QGridLayout, 
+                             QHBoxLayout, QWidget, QVBoxLayout, QPushButton, 
+                             QFileDialog, QLabel, QLineEdit, QSplitter, QCheckBox)
+from PyQt5.QtGui import QPixmap, QImage
+from PyQt5.QtCore import Qt, QRunnable, QThreadPool, pyqtSignal, pyqtSlot, QObject
 from PIL import Image
+import glob
+import os
+import sys
 
 # Define constants
 IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png']
@@ -17,18 +18,42 @@ class ClickableLabel(QLabel):
     def mousePressEvent(self, event):
         self.clicked.emit()
 
+class WorkerSignals(QObject):
+    thumbnailLoaded = pyqtSignal(QPixmap, int)
+
+class ThumbnailLoader(QRunnable):
+    def __init__(self, image_path, thumbnail_size, index):
+        super().__init__()
+        self.signals = WorkerSignals()
+        self.image_path = image_path
+        self.thumbnail_size = thumbnail_size
+        self.index = index
+
+    @pyqtSlot()
+    def run(self):
+        image = QImage()
+        if not image.load(self.image_path):
+            print(f"Failed to load image: {self.image_path}")
+            return
+        image = image.scaledToWidth(self.thumbnail_size)
+        pixmap = QPixmap.fromImage(image)
+        self.signals.thumbnailLoaded.emit(pixmap, self.index)
+
 class ImageTagger(QWidget):
     def __init__(self):
         super().__init__()
 
+        self.setStyleSheet("QCheckBox{margin-left:50%; margin-right:50%;}")
         self.images = []
+        self.items = []
 
         self.initUI()
+        self.thread_pool = QThreadPool()
 
     def initUI(self):
         self.setWindowTitle('Image Tagger')
 
-        self.layout = QVBoxLayout()
+        self.layout = QVBoxLayout(self)
         self.setLayout(self.layout)
 
         self.load_button = QPushButton('Load Images')
@@ -72,81 +97,56 @@ class ImageTagger(QWidget):
         self.thumbnail_slider.setMinimum(50)
         self.thumbnail_slider.setMaximum(500)
         self.thumbnail_slider.setValue(THUMBNAIL_SIZE)
-        self.thumbnail_slider.valueChanged.connect(self.update_thumbnails)
         self.thumbnail_slider.setFixedHeight(50)
         self.splitter.addWidget(self.thumbnail_slider)
-
 
     def load_images(self):
         dir_path = QFileDialog.getExistingDirectory(self, 'Select a directory')
         print(f"Selected directory: {dir_path}")
-        
+
         paths = []
         for ext in IMAGE_EXTENSIONS:
             paths.extend(glob.glob(os.path.join(dir_path, f'*{ext}')))
-
+            
         print(f"Found {len(paths)} image(s) in the directory.")
 
         self.images = paths
-        self.update_thumbnails()
+        self.update_gallery()
 
-    def update_thumbnails(self):
-        THUMBNAIL_SIZE = self.thumbnail_slider.value()
-
-        for i in range(self.grid_layout.count()):
-            self.grid_layout.itemAt(i).widget().deleteLater()
-
-        column_count = self.scroll_area.width() // THUMBNAIL_SIZE
+    def update_gallery(self):
+        self.thread_pool.setMaxThreadCount(10)
 
         for i, path in enumerate(self.images):
-            print(f"Loading image: {path}")
-            pixmap = QPixmap(path)
+            thumbnail_loader = ThumbnailLoader(path, THUMBNAIL_SIZE, i)
+            thumbnail_loader.signals.thumbnailLoaded.connect(self.add_thumbnail)
+            self.thread_pool.start(thumbnail_loader)
 
-            if pixmap.isNull():
-                print(f"Failed to create QPixmap from image: {path}")
-                continue
+    @pyqtSlot(QPixmap, int)
+    def add_thumbnail(self, pixmap, img_index):
+        label = ClickableLabel()
+        label.setPixmap(pixmap)
 
-            pixmap = pixmap.scaledToWidth(THUMBNAIL_SIZE)
+        checkbox = QCheckBox()
+        label.clicked.connect(checkbox.toggle)
 
-            if pixmap.isNull():
-                print(f"Failed to scale QPixmap from image: {path}")
-                continue
+        container_widget = QWidget()
+        container_layout = QVBoxLayout(container_widget)
+        container_layout.addWidget(label)
+        container_layout.addWidget(checkbox)
+        self.items.append(container_widget)
 
-            # Create a widget to hold both the QLabel and QCheckBox
-            widget = QWidget()
-            layout = QHBoxLayout(widget)
-
-            icon = ClickableLabel()
-            icon.setPixmap(pixmap)
-            layout.addWidget(icon)
-
-            check_box = QCheckBox()
-            layout.addWidget(check_box)
-
-            icon.clicked.connect(check_box.toggle)
-
-            row = i // column_count
-            column = i % column_count
-            self.grid_layout.addWidget(widget, row, column)
-            
-    def resizeEvent(self, event):
-        self.update_thumbnails()
+        self.grid_layout.addWidget(container_widget, img_index // 5, img_index % 5)
 
     def tag_images(self):
         tag = self.tag_entry.text()
-
-        for i in range(self.image_list.count()):
-            item = self.image_list.item(i)
-            check_box = self.image_list.itemWidget(item)
-            if check_box.isChecked():
-                image = self.images[i]
+        for checkbox_widget, image in zip(self.items, self.images):
+            checkbox = checkbox_widget.children()[-1]
+            if checkbox.isChecked():
                 txt_file = f"{os.path.splitext(image)[0]}.txt"
                 with open(txt_file, "a") as f:
                     f.write(tag + "\n")
-                check_box.setChecked(False)
-
+                checkbox.setChecked(False)
         self.tag_entry.clear()
-
 
 app = QApplication(sys.argv)
 
